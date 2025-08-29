@@ -73,7 +73,6 @@ class TimeInterpolatorRunner(DefaultRunner):
         #     config = RunConfiguration.load(config)
 
         super().__init__(config)
-        self.reference_date = self.config.date
         self.patch_checkpoint_lagged_property()
         self.device = get_available_device()
         assert (
