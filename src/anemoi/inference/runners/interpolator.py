@@ -12,13 +12,10 @@ import logging
 from collections.abc import Generator
 
 import numpy as np
-import torch
-import torch.nn.functional
-from anemoi.models.models import AnemoiModelEncProcDecInterpolator
 from anemoi.utils.dates import frequency_to_timedelta as to_timedelta
 from anemoi.utils.timer import Timer
 from numpy.typing import NDArray
-
+import torch
 from anemoi.inference.config import Configuration
 from anemoi.inference.config.run import RunConfiguration
 from anemoi.inference.device import get_available_device
@@ -72,7 +69,12 @@ class TimeInterpolatorRunner(DefaultRunner):
         # if not isinstance(config, BaseModel):
         #     config = RunConfiguration.load(config)
 
+        from anemoi.models.models import AnemoiModelEncProcDecInterpolator
+
         super().__init__(config)
+
+        self.include_forcings = config.include_forcings if hasattr(config, "include_forcings") else False
+        print(config)
         self.patch_checkpoint_lagged_property()
         self.device = get_available_device()
         assert (
@@ -159,9 +161,12 @@ class TimeInterpolatorRunner(DefaultRunner):
             LOG.info(f"Processing interpolation window {window_idx + 1}/{num_windows} starting at {window_start_date}")
 
             # Create input state for this window
-            input_state = input.create_input_state(
-                date=window_start_date, include_forcings=False, ref_date_index=0
-            )  # for interpolator, the first date is present and the last is future. For AR models with multiple input states, the last date is the current date. This is why the distinction is made here.
+            if self.include_forcings:
+                input_state = input.create_input_state(date=window_start_date)
+            else:
+                input_state = input.create_input_state(
+                    date=window_start_date, include_forcings=self.include_forcings, ref_date_index=0
+                )  # for interpolator, the first date is present and the last is future. For AR models with multiple input states, the last date is the current date. This is why the distinction is made here.
             self.input_state_hook(input_state)
 
             # Run interpolation for this window
@@ -390,7 +395,7 @@ class TimeInterpolatorRunner(DefaultRunner):
                 output = np.squeeze(y_pred.cpu().numpy())  # shape: (values, variables)
 
             if self.trace:
-                self.trace.write_output_tensor(date, s, output, self.checkpoint.output_tensor_index_to_variable)
+                self.trace.write_output_tensor(date, s, output, self.checkpoint.output_tensor_index_to_variable,self.checkpoint.timestep)
 
             # Update state
             with ProfilingLabel("Updating state (CPU)", self.use_profiler):

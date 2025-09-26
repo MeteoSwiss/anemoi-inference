@@ -34,6 +34,8 @@ from ..post_processors import create_post_processor
 from ..pre_processors import create_pre_processor
 from ..runner import Runner
 from . import runner_registry
+import torch
+import torch.distributed as dist
 
 LOG = logging.getLogger(__name__)
 
@@ -136,7 +138,8 @@ class DefaultRunner(Runner):
             output.write_state(state)
 
         output.close()
-
+        if dist.is_initialized():
+            dist.destroy_process_group()
         if "accumulate_from_start_of_forecast" not in self.config.post_processors:
             LOG.warning(
                 """
